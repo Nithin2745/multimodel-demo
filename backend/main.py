@@ -25,7 +25,7 @@ app.add_middleware(CORSMiddleware, allow_origins=frontend_origins, allow_methods
 IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 AUDIO_TYPES = {"audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/webm", "video/webm"}
 DEFAULT_PROMPT = "Listen to the spoken question and answer it based on the image. Give a short, simple answer."
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODELS = [model.strip() for model in os.getenv("GEMINI_MODELS", "gemini-2.5-flash,gemini-2.5-flash-lite").split(",") if model.strip()]
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", "multimodel.db"))
 TOKEN_SECRET = os.getenv("TOKEN_SECRET", "local-development-secret-change-me")
 
@@ -121,15 +121,20 @@ def convert_webm_to_wav(source_path: str) -> str:
 
 
 def generate_with_retry(client: genai.Client, contents: list[object]):
-    for attempt in range(3):
-        try:
-            return client.models.generate_content(model=GEMINI_MODEL, contents=contents)
-        except Exception as error:
-            message = str(error)
-            is_temporary = "503" in message or "UNAVAILABLE" in message
-            if not is_temporary or attempt == 2:
-                raise
-            time.sleep(2 ** (attempt + 1))
+    last_error = None
+    for model in GEMINI_MODELS:
+        for attempt in range(2):
+            try:
+                return client.models.generate_content(model=model, contents=contents)
+            except Exception as error:
+                last_error = error
+                message = str(error)
+                is_temporary = "503" in message or "UNAVAILABLE" in message
+                if not is_temporary:
+                    raise
+                if attempt == 0:
+                    time.sleep(2)
+    raise last_error or RuntimeError("No Gemini model is configured.")
 
 
 initialize_database()
@@ -227,7 +232,7 @@ async def analyze(image: UploadFile = File(...), audio: UploadFile = File(...), 
     except Exception as error:
         message = str(error)
         if "503" in message or "UNAVAILABLE" in message:
-            raise HTTPException(503, "Gemini is temporarily busy. Please wait a moment and try again.") from error
+            raise HTTPException(503, "Gemini models are temporarily busy. Please wait a moment and try again.") from error
         raise HTTPException(502, f"Multimodal processing failed: {error}") from error
     finally:
         for path in (audio_path, converted_audio_path, output_path):
