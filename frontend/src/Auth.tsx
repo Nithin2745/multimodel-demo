@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight, LockKeyhole, Sparkles, WandSparkles } from "lucide-react";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+
 type User = { id: number; name: string; email: string };
 type Props = { onAuthenticated: (token: string, user: User) => void };
 
@@ -15,7 +17,7 @@ export default function Auth({ onAuthenticated }: Props) {
     event.preventDefault(); setBusy(true); setError("");
     const form = new FormData(); form.append("email", email); form.append("password", password); if (mode === "signup") form.append("name", name);
     try {
-      const response = await fetch(`/api/auth/${mode}`, { method: "POST", body: form });
+      const response = await fetch(`${API_BASE_URL}/api/auth/${mode}`, { method: "POST", body: form });
       const body = await response.text();
       let data: { detail?: string; token?: string; user?: User } = {};
       try { data = body ? JSON.parse(body) : {}; } catch { data = {}; }

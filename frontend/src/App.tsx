@@ -3,6 +3,7 @@ import { AudioLines, Check, ImagePlus, LoaderCircle, Mic2, Play, RotateCcw, Spar
 import Auth from "./Auth";
 
 const PROMPT = "Listen to the spoken question and answer it based on the image. Give a short, simple answer.";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 type FileValue = File | null;
 type User = { id: number; name: string; email: string };
 
@@ -39,7 +40,7 @@ export default function App() {
     if (!image || !audio) { setError("Add one image and one spoken question first."); return; }
     setBusy(true); setError(""); setAnswer("");
     const form = new FormData(); form.append("image", image); form.append("audio", audio); form.append("instruction", PROMPT);
-    try { const response = await fetch("/api/analyze", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form }); const data = await response.json(); if (!response.ok) throw new Error(data.detail); setAnswer(data.answer); setAnswerAudio(data.audio ? `data:audio/mpeg;base64,${data.audio}` : ""); if (!data.audio) window.speechSynthesis?.speak(new SpeechSynthesisUtterance(data.answer)); }
+    try { const response = await fetch(`${API_BASE_URL}/api/analyze`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form }); const data = await response.json(); if (!response.ok) throw new Error(data.detail); setAnswer(data.answer); setAnswerAudio(data.audio ? `data:audio/mpeg;base64,${data.audio}` : ""); if (!data.audio) window.speechSynthesis?.speak(new SpeechSynthesisUtterance(data.answer)); }
     catch (requestError) { setError(requestError instanceof Error ? requestError.message : "The service could not process those files."); } finally { setBusy(false); }
   };
   const reset = () => { setImage(null); setAudio(null); setAnswer(""); setAnswerAudio(""); setError(""); };
